@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Back to the Past</title>
+<meta name="theme-color" content="#2b2118">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+:root{--bg:#efe6d2;--ink:#2b2118;--mute:#6f5b45;--line:#cdbd9d;--accent:#5a3a1e;--onaccent:#f6eedb;--card:#f7f0df;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1c1610;--ink:#eadfc7;--mute:#b3a07f;--line:#3d3123;--accent:#d8b98a;--onaccent:#1c1610;--card:#251d14;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#1c1610;--ink:#eadfc7;--mute:#b3a07f;--line:#3d3123;--accent:#d8b98a;--onaccent:#1c1610;--card:#251d14;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Georgia,"Times New Roman","Noto Naskh Arabic",serif;line-height:1.6}
+main{max-width:520px;margin:0 auto;padding:20px 16px 40px}
+h1{font-size:28px;margin:8px 0 4px;font-weight:700}
+p.sub{margin:0 0 18px;color:var(--mute)}
+.pick{display:block;text-align:center;padding:14px;border:2px dashed var(--line);border-radius:6px;background:var(--card);cursor:pointer;font-size:18px}
+.pick input{display:none}
+.stage{margin-top:18px;min-height:40px}
+.stage img{width:100%;height:auto;display:block;border-radius:2px;box-shadow:0 6px 24px rgba(0,0,0,.35)}
+.hint{color:var(--mute);font-size:14px;margin:10px 0 0;text-align:center}
+.ctl{margin-top:18px;border-top:1px solid var(--line);padding-top:14px;display:none}
+.ctl label{display:block;margin:10px 0 4px}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.row{display:flex;gap:8px;margin-top:6px;flex-wrap:wrap}
+.row button{flex:1;min-width:90px;padding:10px;font:inherit;border:1px solid var(--accent);background:transparent;color:var(--ink);border-radius:4px;cursor:pointer}
+.row button.on{background:var(--accent);color:var(--onaccent)}
+.chk{display:flex;align-items:center;gap:8px;margin-top:12px}
+.txt{width:100%;margin-top:8px;padding:10px;font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:4px}
+canvas{display:none}
+</style>
+</head>
+<body>
+<main>
+<h1>Back to the Past</h1>
+<p class="sub">اختر صورة وحوّلها لصورة قديمة من أواخر القرن التاسع عشر.</p>
+<label class="pick"><input type="file" id="f" accept="image/*">اختر صورة من جهازك</label>
+<div class="stage"><img id="out" alt="" hidden><p class="hint" id="hint" hidden>اضغط مطولاً على الصورة لحفظها</p></div>
+<div class="ctl" id="ctl">
+<label for="age">قوة التقادم</label>
+<input type="range" id="age" min="0" max="100" value="60">
+<div class="row" id="tones">
+<button data-t="sepia" class="on">بني قديم</button>
+<button data-t="gray">رمادي فضي</button>
+<button data-t="yellow">أصفر باهت</button>
+<button data-t="daguerre">داغيروتايب</button>
+</div>
+<label class="chk"><input type="checkbox" id="frame" checked> إطار ورقي</label>
+<input type="text" id="cap" class="txt" maxlength="40" placeholder="نص أسفل الصورة (مثلاً: 1890)">
+</div>
+<canvas id="c"></canvas>
+<p class="hint"><a href="privacy.html" style="color:inherit">سياسة الخصوصية</a></p>
+</main>
+<script>
+(function(){
+var src=null,tone="sepia",pending=false;
+var cv=document.getElementById("c"),ctx=cv.getContext("2d",{willReadFrequently:true});
+var out=document.getElementById("out"),ctl=document.getElementById("ctl"),hint=document.getElementById("hint");
+var ageEl=document.getElementById("age"),frameEl=document.getElementById("frame"),capEl=document.getElementById("cap");
+var TONES={sepia:[[28,18,10],[238,222,186]],gray:[[20,20,20],[236,236,232]],yellow:[[46,32,12],[246,230,170]],daguerre:[[16,20,26],[206,218,226]]};
+function rnd(s){return function(){s=(s*16807)%2147483647;return (s-1)/2147483646}}
+function render(){
+ if(!src)return;
+ var age=ageEl.value/100,max=1000,sc=Math.min(1,max/Math.max(src.width,src.height));
+ var w=Math.round(src.width*sc),h=Math.round(src.height*sc);
+ cv.width=w;cv.height=h;
+ try{ctx.filter="blur("+(0.4+age*1.1).toFixed(2)+"px)"}catch(e){}
+ ctx.drawImage(src,0,0,w,h);ctx.filter="none";
+ var d=ctx.getImageData(0,0,w,h),p=d.data,t=TONES[tone],lo=t[0],hi=t[1];
+ var cx=w/2,cy=h/2,md=Math.sqrt(cx*cx+cy*cy),R=rnd(7);
+ for(var y=0;y<h;y++){for(var x=0;x<w;x++){
+  var i=(y*w+x)*4,g=0.299*p[i]+0.587*p[i+1]+0.114*p[i+2];
+  g=(g-128)*(1-0.3*age)+128;
+  g+=(R()-0.5)*70*age;
+  var dx=x-cx,dy=y-cy,v=Math.sqrt(dx*dx+dy*dy)/md;
+  g*=1-Math.pow(v,2.2)*0.85*age;
+  var f=Math.max(0,Math.min(1,g/255));
+  f=0.06*age+f*(1-0.12*age);
+  p[i]=lo[0]+(hi[0]-lo[0])*f;p[i+1]=lo[1]+(hi[1]-lo[1])*f;p[i+2]=lo[2]+(hi[2]-lo[2])*f;
+ }}
+ ctx.putImageData(d,0,0);
+ var S=rnd(42),n=Math.round(age*14),k;
+ ctx.lineCap="round";
+ for(k=0;k<n;k++){
+  var sx=S()*w,sy=S()*h*0.6,len=h*(0.15+S()*0.5);
+  ctx.strokeStyle="rgba(250,240,215,"+(0.1+S()*0.25)+")";ctx.lineWidth=0.5+S()*1.2;
+  ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(sx+(S()-0.5)*8,sy+len);ctx.stroke();
+ }
+ for(k=0;k<age*90;k++){
+  ctx.fillStyle=S()>0.5?"rgba(250,240,215,0.5)":"rgba(30,20,10,0.45)";
+  ctx.beginPath();ctx.arc(S()*w,S()*h,0.4+S()*1.8,0,6.3);ctx.fill();
+ }
+ var res=cv;
+ if(frameEl.checked){
+  var b=Math.round(Math.min(w,h)*0.05),o=document.createElement("canvas");
+  var cap=capEl.value.trim(),bb=cap?b*3:b;o.width=w+b*2;o.height=h+b+bb;
+  var oc=o.getContext("2d");
+  oc.fillStyle="rgb("+hi[0]+","+hi[1]+","+hi[2]+")";oc.fillRect(0,0,o.width,o.height);
+  oc.fillStyle="rgba(90,60,30,"+(0.08+0.12*age)+")";oc.fillRect(0,0,o.width,o.height);
+  oc.drawImage(cv,b,b);
+  oc.strokeStyle="rgba(60,40,20,0.5)";oc.lineWidth=1.5;oc.strokeRect(b-1,b-1,w+2,h+2);
+  if(cap){oc.fillStyle="rgba(50,32,16,0.8)";oc.font="italic "+Math.round(b*1.3)+"px Georgia,serif";oc.textAlign="center";oc.textBaseline="middle";oc.fillText(cap,o.width/2,h+b+bb/2);}
+  res=o;
+ }
+ out.src=res.toDataURL("image/jpeg",0.92);
+ out.hidden=false;hint.hidden=false;ctl.style.display="block";
+}
+function queue(){if(pending)return;pending=true;requestAnimationFrame(function(){pending=false;render()})}
+document.getElementById("f").addEventListener("change",function(e){
+ var file=e.target.files&&e.target.files[0];if(!file)return;
+ var url=URL.createObjectURL(file),im=new Image();
+ im.onload=function(){src=im;render();URL.revokeObjectURL(url)};
+ im.onerror=function(){hint.hidden=false;hint.textContent="تعذّر فتح هذه الصورة. جرّب صورة JPG أو PNG."};
+ im.src=url;
+});
+ageEl.addEventListener("input",queue);
+frameEl.addEventListener("change",queue);
+capEl.addEventListener("input",queue);
+document.getElementById("tones").addEventListener("click",function(e){
+ var b=e.target.closest("button");if(!b)return;
+ tone=b.getAttribute("data-t");
+ Array.prototype.forEach.call(this.children,function(x){x.classList.toggle("on",x===b)});
+ queue();
+});
+if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){})})}
+})();
+</script>
+</body>
+</html>
